@@ -1,0 +1,60 @@
+import { getProducts, Product } from "../../lib/api-services";
+import Link from "next/link";
+import ForYouGrid from "./ForYouGrid";
+import { FiShoppingBag } from "react-icons/fi";
+
+const ForYou = async () => {
+  let products: Product[] = [];
+
+  try {
+    products = await getProducts();
+    // Limit to 10 products
+    products = products.slice(0, 10);
+  } catch (error) {
+    console.error("Failed to load products:", error);
+    // products will remain empty array
+  }
+
+  if (products.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="max-w-7xl mx-auto px-5 overflow-hidden md:pt-6 pt-3">
+      <div className="mb-3 sm:mb-4 flex items-start justify-between gap-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <FiShoppingBag size={18} />
+            </span>
+            <h1 className="sm:text-2xl text-xl font-bold text-gray-900">
+              Our Collection
+            </h1>
+          </div>
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
+            Fresh arrivals and customer favorites in one place.
+          </p>
+        </div>
+        <Link
+          href={"/products"}
+          className="shrink-0 text-primary underline underline-offset-4 hover:text-gray-700 cursor-pointer transition-all font-medium text-sm"
+        >
+          View All Products
+        </Link>
+      </div>
+
+      <ForYouGrid products={products} />
+
+      <div className="flex items-center justify-center">
+        <Link
+          href={"/products"}
+          className="mt-5 text-center bg-primary hover:bg-gray-800 max-w-max text-white px-10 py-1.5 rounded cursor-pointer"
+        >
+          View More
+        </Link>
+      </div>
+    </section>
+  );
+};
+
+export default ForYou;

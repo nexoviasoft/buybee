@@ -1,0 +1,412 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import {
+  FiChevronDown,
+  FiCreditCard,
+  FiFileText,
+  FiShield,
+} from "react-icons/fi";
+import { getTerms } from "@/lib/api-services";
+import type { PolicyPage } from "@/types/policy";
+
+const faqs = [
+  {
+    q: "How do I know if the order is confirmed?",
+    a: "If the order is successfully confirmed, you will receive an SMS/email notification or see a status update in your account dashboard. Just being in the cart does not mean it is confirmed.",
+  },
+  {
+    q: "What happens if a payment fails or there is a double debit?",
+    a: "In case of a failed transaction or duplicate debit, the excess amount will be refunded after verification by the gateway/bank. Processing time depends on the bank's policy.",
+  },
+  {
+    q: "Can I cancel an order?",
+    a: "An order cancellation request can be made before delivery depending on the processing status. Once confirmed, the refund/adjustment policy will apply.",
+  },
+  {
+    q: "Will I be notified separately if the terms change?",
+    a: "If there are significant changes, we publish the updated terms on the site and highlight them via notifications or banners if necessary.",
+  },
+];
+
+const TermsPage = () => {
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [termsContent, setTermsContent] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTerms = async () => {
+      try {
+        const data: PolicyPage[] = await getTerms();
+        if (!isMounted) return;
+        if (Array.isArray(data) && data.length > 0 && data[0]?.content) {
+          setTermsContent(data[0].content);
+        }
+      } catch (error) {
+        console.error("Failed to load terms content:", error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadTerms();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+  
+  useEffect(() => {
+    if (!termsContent || !contentRef.current) return;
+    const root = contentRef.current;
+    const tables = root.querySelectorAll("table");
+    tables.forEach((table) => {
+      table.classList.add("w-full", "border", "border-gray-300");
+      (table as HTMLTableElement).style.borderCollapse = "collapse";
+      const cells = table.querySelectorAll("th, td");
+      cells.forEach((cell) => {
+        (cell as HTMLElement).classList.add("border", "border-gray-300", "p-2");
+      });
+    });
+    const uls = root.querySelectorAll("ul");
+    uls.forEach((ul) => {
+      (ul as HTMLElement).classList.add("list-disc", "list-inside", "ml-4");
+    });
+    const ols = root.querySelectorAll("ol");
+    ols.forEach((ol) => {
+      (ol as HTMLElement).classList.add("list-decimal", "list-inside", "ml-4");
+    });
+    const bolds = root.querySelectorAll("b, strong");
+    bolds.forEach((b) => {
+      (b as HTMLElement).classList.add("font-bold");
+    });
+    const italics = root.querySelectorAll("i, em");
+    italics.forEach((i) => {
+      (i as HTMLElement).classList.add("italic");
+    });
+  }, [termsContent]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-white to-primary/5">
+      <div className="max-w-5xl mx-auto px-5 py-10 md:py-14 space-y-10">
+        <header className="space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-3">
+              <span className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-primary bg-primary/10 px-4 py-1.5 rounded-full">
+                <FiShield className="text-sm" />
+                Terms & Conditions
+              </span>
+              <h1 className="text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">
+                Terms of Service
+              </h1>
+              <p className="text-sm md:text-base text-gray-600 max-w-2xl">
+                Read the following terms carefully before ordering, creating an account, or using any services from our e-commerce platform. Use our services only if you agree to these terms.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white shadow-sm border border-gray-200 px-5 py-4 text-xs text-gray-700 max-w-xs">
+              <p className="font-semibold text-gray-900 mb-1">
+                Summary
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                Order, payment, delivery, and return – all policies are explained on this page.
+              </p>
+            </div>
+          </div>
+
+          <section className="grid grid-cols-2 sm:grid-cols-3 sm:gap-4 gap-2">
+            <div className="rounded-2xl bg-white border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <FiFileText className="text-primary text-sm" />
+                <p className="text-xs font-semibold text-gray-900">
+                  Order & Pricing
+                </p>
+              </div>
+              <p className="text-xs text-gray-600">
+                Price, stock, and offers may be updated; orders are not final without confirmation.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <FiCreditCard className="text-primary text-sm" />
+                <p className="text-xs font-semibold text-gray-900">
+                  Payment & Security
+                </p>
+              </div>
+              <p className="text-xs text-gray-600">
+                Online payments are processed through certified gateways; card data is not stored on our servers.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <FiShield className="text-primary text-sm" />
+                <p className="text-xs font-semibold text-gray-900">
+                  Return & Refund
+                </p>
+              </div>
+              <p className="text-xs text-gray-600">
+                Return and refund are applicable according to specific policies; details are given on a separate page.
+              </p>
+            </div>
+          </section>
+        </header>
+
+        <section className="rounded-xl bg-white border border-gray-200 px-6 py-8 md:px-8 md:py-9 shadow-[0_4px_12px_rgba(15,23,42,0.08)] space-y-8 text-gray-800">
+          {isLoading && !termsContent && (
+            <p className="text-sm text-gray-500">Loading Terms & Conditions...</p>
+          )}
+
+          {termsContent ? (
+            <article
+              className="prose max-w-none prose-sm sm:prose-base text-gray-800"
+              ref={contentRef}
+              dangerouslySetInnerHTML={{ __html: termsContent }}
+            />
+          ) : (
+            <article className="prose max-w-none prose-sm sm:prose-base text-gray-800 flex flex-col gap-4">
+            <section>
+              <h2>১. একাউন্ট তৈরি ও ইউজারের দায়িত্ব</h2>
+              <p>
+                আমাদের প্ল্যাটফর্মে একাউন্ট তৈরি করার সময় আপনি সঠিক, হালনাগাদ
+                এবং সম্পূর্ণ তথ্য প্রদান করবেন। আপনার একাউন্টের ইউজারনেম,
+                পাসওয়ার্ড এবং অন্যান্য লগইন ডিটেইলস গোপন রাখা আপনার একান্ত
+                দায়িত্ব।
+              </p>
+              <ul>
+                <li>অন্য কারও তথ্য ব্যবহার করে একাউন্ট খোলা যাবে না।</li>
+                <li>
+                  আপনার একাউন্ট দিয়ে যে কোনো অ্যাক্টিভিটি হলে তার দায়ভার
+                  আপনার।
+                </li>
+                <li>
+                  সন্দেহজনক অ্যাক্টিভিটি বুঝতে পারলে দ্রুত পাসওয়ার্ড পরিবর্তন ও
+                  সাপোর্টে জানান।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>২. অর্ডার, প্রাইস ও স্টক</h2>
+              <p>
+                আমাদের সাইটে প্রদর্শিত প্রাইস, অফার এবং স্টক তথ্য সময় সময় আপডেট
+                হতে পারে। কার্টে যোগ করা মানেই অর্ডার কনফার্ম নয়; অর্ডার
+                কনফার্মেশন SMS/ইমেইল বা ড্যাশবোর্ড আপডেটের মাধ্যমে জানানো হবে।
+              </p>
+              <ul>
+                <li>
+                  ভুল প্রাইস/টাইপোগ্রাফিক্যাল ভুল থাকলে অর্ডার ক্যানসেল করার
+                  অধিকার আমাদের রয়েছে।
+                </li>
+                <li>
+                  স্টক শেষ হয়ে গেলে কনফার্ম হওয়া অর্ডারও বিশেষ ক্ষেত্রে বাতিল
+                  হতে পারে (রিফান্ড সহ)।
+                </li>
+                <li>একই সময়ে একাধিক অফার সবসময় প্রযোজ্য নাও হতে পারে।</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৩. পেমেন্ট ও ট্রানজ্যাকশন</h2>
+              <p>
+                আপনি ক্যাশ অন ডেলিভারি, মোবাইল ব্যাংকিং, কার্ড বা অন্যান্য
+                উপলব্ধ পেমেন্ট মেথড ব্যবহার করতে পারেন। অনলাইন পেমেন্ট সবসময়
+                সার্টিফায়েড পেমেন্ট গেটওয়ের মাধ্যমে প্রসেস হয়।
+              </p>
+              <ul>
+                <li>
+                  কোনো ফেইলড/লিম্বো ট্রানজ্যাকশন হলে পেমেন্ট গেটওয়ে/ব্যাংকের
+                  প্রসেসিং টাইম প্রযোজ্য।
+                </li>
+                <li>
+                  ডুপ্লিকেট ডেবিট হলে ভেরিফিকেশন শেষে অতিরিক্ত এমাউন্ট রিফান্ড
+                  করা হবে।
+                </li>
+                <li>
+                  ফ্রড/অস্বাভাবিক অ্যাক্টিভিটির ক্ষেত্রে অর্ডার হোল্ড বা ব্লক
+                  করা হতে পারে।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৪. ডেলিভারি, বিলম্ব ও দায়িত্ব</h2>
+              <p>
+                আমরা নির্ধারিত সময়ের মধ্যে পণ্য ডেলিভারির সর্বোচ্চ চেষ্টা করি।
+                তবে কুরিয়ার, আবহাওয়া, রেগুলেটরি ইস্যু বা অন্য যে কোনো বাহ্যিক
+                কারণে বিলম্ব হতে পারে।
+              </p>
+              <ul>
+                <li>
+                  অর্ডার কনফার্মেশনের সময় আনুমানিক ডেলিভারি টাইমলাইন জানানো
+                  হয়।
+                </li>
+                <li>
+                  ডেলিভারির আগে কুরিয়ার আপনার সাথে কল করে ঠিকানা নিশ্চিত করতে
+                  পারে।
+                </li>
+                <li>
+                  অর্ডার গ্রহণের সময় প্যাকেটের অবস্থান চেক করে নিতে উৎসাহিত করা
+                  হয়।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৫. রিটার্ন, রিফান্ড ও ক্যানসেলেশন</h2>
+              <p>
+                রিটার্ন ও রিফান্ড সম্পর্কিত বিস্তারিত তথ্য আলাদা “রিফান্ড এবং
+                রিটার্ন পলিসি” পেইজে দেওয়া আছে। এই টার্মস সেই নীতিমালার
+                রেফারেন্স হিসেবে কাজ করে।
+              </p>
+              <ul>
+                <li>
+                  ডেলিভারির পর নির্দিষ্ট সময়ের মধ্যে রিটার্ন/রিফান্ড রিকোয়েস্ট
+                  করতে হবে।
+                </li>
+                <li>
+                  প্রডাক্ট কন্ডিশন ও ক্যাটাগরি অনুযায়ী রিফান্ড বা রিপ্লেসমেন্ট
+                  প্রযোজ্য হতে পারে।
+                </li>
+                <li>
+                  অপ্রতিরোধ্য পরিস্থিতিতে (force majeure) কিছু শর্ত সাময়িকভাবে
+                  পরিবর্তিত হতে পারে।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৬. প্রডাক্ট তথ্য ও গ্যারান্টি</h2>
+              <p>
+                প্রডাক্টের ছবি, বর্ণনা ও স্পেসিফিকেশন যথাসম্ভব সঠিকভাবে
+                প্রদর্শনের চেষ্টা করা হয়। তবে ডিভাইস স্ক্রিন, লট ভ্যারিয়েশন
+                ইত্যাদির কারণে সামান্য পার্থক্য থাকতে পারে।
+              </p>
+              <ul>
+                <li>
+                  ব্র্যান্ডেড প্রডাক্টের ক্ষেত্রে ব্র্যান্ডের অফিসিয়াল
+                  ওয়ারেন্টি নীতি প্রযোজ্য।
+                </li>
+                <li>
+                  লোকাল বা জেনেরিক প্রডাক্টে আলাদা ওয়ারেন্টি পলিসি থাকলে তা
+                  প্রডাক্ট ডিটেইলে উল্লেখ থাকবে।
+                </li>
+                <li>
+                  ভুল ব্যবহার বা ম্যানুয়াল না মেনে ব্যবহারজনিত ক্ষতির জন্য আমরা
+                  দায়ী নই।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৭. প্রডাক্ট টাইপ অনুযায়ী ব্যবহার ও ঝুঁকি</h2>
+              <p>
+                বিভিন্ন ধরনের পণ্য ব্যবহারের আগে অবশ্যই প্রডাক্ট ডিটেইল, লেবেল ও
+                ম্যানুয়াল ভালোভাবে পড়ে নেওয়া জরুরি। নিচে কিছু সাধারণ ক্যাটাগরি
+                অনুযায়ী নির্দেশনা দেওয়া হলো:
+              </p>
+              <ul>
+                <li>
+                  ইলেকট্রনিক্স/গ্যাজেট: নির্দিষ্ট ভোল্টেজ, চার্জার এবং পরিবেশে
+                  ব্যবহার করতে হবে।
+                </li>
+                <li>
+                  ফ্যাশন/পোশাক: ওয়াশ কেয়ার লেবেল অনুযায়ী পরিষ্কার না করলে
+                  কালার ফেড বা শ্রিংক হতে পারে।
+                </li>
+                <li>
+                  বিউটি/কসমেটিকস: সংবেদনশীল ত্বকের ক্ষেত্রে প্যাচ টেস্ট করার পর
+                  ব্যবহার করা উত্তম।
+                </li>
+                <li>
+                  হোম/ডেকর: ইনস্টলেশনের ক্ষেত্রে প্রফেশনাল সার্ভিস ব্যবহার করাকে
+                  আমরা উৎসাহিত করি।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৮. নিষিদ্ধ ব্যবহার ও অপব্যবহার</h2>
+              <p>
+                আমাদের প্ল্যাটফর্ম এমন কোনো কাজে ব্যবহার করা যাবে না যা
+                আইনবিরোধী, প্রতারণামূলক, ক্ষতিকর বা অন্যের অধিকার লঙ্ঘন করে।
+              </p>
+              <ul>
+                <li>নকল অর্ডার, ভুয়া রিভিউ বা স্প্যামিং কঠোরভাবে নিষিদ্ধ।</li>
+                <li>
+                  ওয়েবসাইট স্ক্র্যাপিং, অননুমোদিত অটোমেশন বা সিকিউরিটি ব্রেকের
+                  চেষ্টা করা যাবে না।
+                </li>
+                <li>
+                  শর্ত ভঙ্গ করলে একাউন্ট সীমাবদ্ধ/বন্ধ করার অধিকার আমাদের রয়েছে।
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>৯. টার্মস পরিবর্তন</h2>
+              <p>
+                ব্যবসায়িক নীতি, আইন বা সার্ভিস মডেল পরিবর্তনের ফলে যে কোনো সময়
+                এই টার্মস এবং কন্ডিশন আপডেট হতে পারে। আপডেটেড ভার্সন সাইটে
+                প্রকাশিত হওয়ার পর তাৎক্ষণিকভাবে কার্যকর হবে।
+              </p>
+            </section>
+
+            <section>
+              <h2>১০. যোগাযোগ</h2>
+              <p>
+                এই টার্মস এবং কন্ডিশন সম্পর্কিত কোনো প্রশ্ন, মতামত বা অভিযোগ
+                থাকলে আমাদের কাস্টমার সাপোর্ট টিমের সাথে যোগাযোগ করুন। আমরা
+                সবসময় চেষ্টা করি আপনাকে স্বচ্ছ এবং নির্ভরযোগ্য সেবা দিতে।
+              </p>
+            </section>
+          </article>
+          )}
+        </section>
+
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900">
+              Frequently Asked Questions (Terms)
+            </h2>
+            <p className="text-sm text-gray-600">
+              Common questions about orders, payments, and policies are answered below.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((item, idx) => (
+              <div
+                key={idx}
+                className="rounded-xl border border-gray-200 bg-white"
+              >
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left px-4 py-3 text-sm md:text-[15px] text-gray-900"
+                  onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                >
+                  <span>{item.q}</span>
+                  <FiChevronDown
+                    className={`h-4 w-4 text-gray-500 transition-transform ${
+                      openFaq === idx ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {openFaq === idx && (
+                  <div className="px-4 pb-3 text-sm text-gray-600">
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
+
+export default TermsPage;

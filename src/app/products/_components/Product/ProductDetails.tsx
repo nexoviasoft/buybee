@@ -1,0 +1,458 @@
+"use client";
+import formatteeNumber from "../../../../utils/formatteNumber";
+import { calculateAverageRating } from "../../../../utils/getAverageRating";
+import { Rate } from "antd";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { FaRegQuestionCircle } from "react-icons/fa";
+import { FaRegClock, FaTruckFast } from "react-icons/fa6";
+import { GoArrowUpRight, GoShareAndroid } from "react-icons/go";
+import {
+  RiMastercardFill,
+  RiShieldCheckFill,
+  RiVisaLine,
+} from "react-icons/ri";
+import { TbCurrencyTaka, TbTruckReturn } from "react-icons/tb";
+import ProductCart from "./ProductCart";
+import Variant from "./Variant";
+import { Review } from "../../../../types/review";
+import {
+  PromoCode,
+  getSystemUserByCompanyId,
+} from "../../../../lib/api-services";
+import { API_CONFIG } from "../../../../lib/api-config";
+
+interface CategoryProps {
+  name: string;
+  slug: string;
+}
+interface List {
+  id: string;
+  item: string;
+}
+
+interface ListItems {
+  id: string;
+  title: string;
+  list: List[];
+}
+interface DescriptionProps {
+  id: string;
+  summary: string;
+  list_items: ListItems[];
+}
+interface ImageProps {
+  name: string;
+  url: string;
+}
+interface VariantProps {
+  available_quantity: number;
+  id: string;
+  price: number;
+  size: string;
+  stock_status: string;
+}
+interface ProductProps {
+  product: {
+    id?: number;
+    companyId?: string;
+    SKU: string;
+    documentId: string;
+    off: number;
+    price: number;
+    discountPrice?: number;
+    title: string;
+    total_sale: number;
+    categories: CategoryProps[];
+    description: DescriptionProps;
+    images: ImageProps[];
+    reviews: Review[];
+    variant: VariantProps[];
+    sizes?: string[];
+  };
+  promos?: PromoCode[];
+}
+
+const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
+  const [price, setPrice] = useState(
+    Number(product?.price ?? product?.variant[0]?.price ?? 0),
+  );
+
+  const [selectedVariant, setSelectedVariant] = useState<{
+    id: string;
+    size: string;
+    price: number;
+  }>({
+    id: product?.variant?.[0]?.id ?? "",
+    size: product?.variant?.[0]?.size ?? "Default",
+    price: Number(product?.variant?.[0]?.price ?? product?.price ?? 0),
+  });
+  const [selectedSize, setSelectedSize] = useState<string>(
+    product?.sizes && product.sizes.length > 0 ? "" : selectedVariant.size || "Default",
+  );
+  const [hasVariantChosen, setHasVariantChosen] = useState(false);
+
+ 
+
+  const handlePrice = useCallback((variantPrice: number = 0) => {
+    setPrice(variantPrice);
+  }, []);
+  const handleVariantSelect = useCallback(
+    (v: { id: string; size: string; price: number }) => {
+      setSelectedVariant(v);
+      if (!product?.sizes || product.sizes.length === 0) {
+        setSelectedSize(v.size);
+      }
+    },
+    [product?.sizes],
+  );
+
+  const [quantity, setQuantity] = useState(1);
+
+  const originalPrice = Number(price || 0);
+  const discountedPrice = Number(product?.discountPrice || 0);
+
+  const getFinalPrice = () => {
+    if (
+      originalPrice > 0 &&
+      discountedPrice > 0 &&
+      discountedPrice < originalPrice
+    ) {
+      return discountedPrice;
+    }
+    if (product?.off && product.off > 0 && originalPrice > 0) {
+      return Math.round(originalPrice - (originalPrice * product.off) / 100);
+    }
+    return originalPrice;
+  };
+
+  const hasDiscount =
+    (discountedPrice > 0 && discountedPrice < originalPrice) ||
+    (Number(product?.off || 0) > 0 && originalPrice > 0);
+  const applicablePromos = promos ?? [];
+
+  const [shareUrl, setShareUrl] = useState<string>("");
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [ownerPhone, setOwnerPhone] = useState<string | null>(null);
+
+  const companyId = useMemo(
+    () => product?.companyId || API_CONFIG.companyId,
+    [product?.companyId],
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setShareUrl(window.location.href);
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadOwner = async () => {
+      try {
+        if (!companyId) return;
+        const user = await getSystemUserByCompanyId(companyId);
+        if (mounted) {
+          setOwnerPhone(user?.phone ?? null);
+        }
+      } catch (error) {
+        // console.error("Failed to load system user for product details:", error);
+      }
+    };
+    loadOwner();
+    return () => {
+      mounted = false;
+    };
+  }, [companyId]);
+
+  const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+    shareUrl,
+  )}`;
+
+  const whatsappShareUrl = `https://wa.me/?text=${encodeURIComponent(
+    `${product?.title} - ${shareUrl}`,
+  )}`;
+
+  const whatsappQuestionUrl = ownerPhone
+    ? `https://wa.me/${encodeURIComponent(
+        ownerPhone.replace(/[^0-9]/g, ""),
+      )}?text=${encodeURIComponent(
+        `Dear Sir, I want to know something about this product: ${product?.title} - ${shareUrl}`,
+      )}`
+    : null;
+
+
+  console.log("Full Product Data:", product);
+
+
+  return (
+    <section className="flex flex-col gap-4 md:gap-5">
+      {/* product category and review amounts start  */}
+      <div className="flex flex-wrap items-center gap-3 min-[400px]:gap-4 text-xs sm:text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-gray-500">
+            Category
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {product?.categories?.map((category, index) => (
+              <span
+                key={category?.slug}
+                className="rounded-full bg-gray-100 px-2 py-[2px] text-[11px] font-medium text-primary"
+              >
+                {category?.name}
+                {index < product.categories.length - 1 && ","}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+        <div className="flex gap-1.5 items-center">
+          <Rate
+            disabled
+            allowHalf
+            defaultValue={calculateAverageRating(product?.reviews)}
+          />
+          <p className="text-xs sm:text-sm text-gray-600">
+            ({product?.reviews.length} Reviews)
+          </p>
+        </div>
+      </div>
+      {/* product category and review amounts end  */}
+
+      {/* title & stock info start */}
+      <h1 className="text-lg sm:text-2xl md:text-3xl font-semibold text-gray-900 leading-snug">
+        {product?.title}
+      </h1>
+      {/* title & stock info end */}
+
+      {/* product  variant start */}
+      <div className="pt-1 border-t border-gray-200">
+        <Variant
+          variant={product?.variant}
+          handlePrice={handlePrice}
+          onSelect={handleVariantSelect}
+          showSize={!product?.sizes || product.sizes.length === 0}
+          onUserSelect={() => setHasVariantChosen(true)}
+        />
+      </div>
+      {/* product variant end */}
+
+      {/* explicit size selector (non-variant) start */}
+      {product?.sizes && product.sizes.length > 0 && (
+        <div className="mt-2">
+          <h2 className=" sm:text-lg text-base font-medium">Size</h2>
+          <div className=" flex gap-2 items-center flex-wrap">
+            {product.sizes.map((sz) => (
+              <button
+                key={sz}
+                onClick={() => setSelectedSize(sz)}
+                className={`btn-rounded border-[1.5px] border-gray-300 px-3 py-1 rounded-lg hover:border-primary transition-all ease-linear duration-200 ${
+                  selectedSize === sz ? "border-primary" : ""
+                }`}
+              >
+                {sz}
+              </button>
+            ))}
+          </div>
+          {!selectedSize && (
+            <p className="text-[11px] text-red-600 mt-1">
+              Select Size
+            </p>
+          )}
+        </div>
+      )}
+      {/* explicit size selector (non-variant) end */}
+      {/* product price info start */}
+      <div className="flex items-end gap-3">
+        <div className="flex items-center text-primary">
+          <span className="text-3xl sm:text-4xl">
+            <TbCurrencyTaka />
+          </span>
+          <h2 className="mt-[2px] sm:text-4xl text-2xl font-bold">
+            {formatteeNumber(getFinalPrice())}
+          </h2>
+        </div>
+        {hasDiscount && (
+          <div className="flex flex-col gap-0.5 text-xs sm:text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              <TbCurrencyTaka size={14} />
+              <span className="line-through">
+                {formatteeNumber(originalPrice)}
+              </span>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-[1px] text-[11px] font-medium text-gray-700">
+              {product?.off}% OFF
+            </span>
+          </div>
+        )}
+      </div>
+      {/* product price info end */}
+
+      
+
+      {/* cart & buy now button start */}
+      <div className="flex min-[1035px]:flex-row md:flex-col min-[500px]:flex-row flex-col gap-3">
+        <div>
+          <ProductCart
+            price={getFinalPrice()}
+            productId={Number(product?.documentId || product?.id)}
+            product={{
+              id: Number(product?.documentId || product?.id),
+              name: product?.title,
+              thumbnail: product?.images?.[0]?.url,
+              images: (product?.images || []).map((img) => ({ url: img.url, alt: img.name })),
+              price: Number(product?.price || 0),
+              discountPrice: Number(product?.discountPrice || 0),
+            }}
+            quantity={quantity}
+            onChangeQuantity={setQuantity}
+            disabled={
+              (product?.sizes && product.sizes.length > 0 ? !selectedSize : false) ||
+              (product?.sizes && product.sizes.length === 0
+                ? (product?.variant?.length || 0) > 1 ||
+                  product?.variant?.some((v) => v.size && v.size.toLowerCase() !== "default")
+                  ? !hasVariantChosen
+                  : false
+                : false) ||
+              quantity < 1
+            }
+          />
+        </div>
+        <Link
+          className="flex-1 flex items-center justify-center gap-1 px-4 py-2 sm:text-base text-sm hover:bg-black bg-primary text-white transition-all ease-linear duration-200 rounded-3xl overflow-hidden"
+          href={`/checkout?productId=${encodeURIComponent(
+            String(product?.documentId || product?.id),
+          )}&companyId=${encodeURIComponent(
+            product?.companyId || "",
+          )}&quantity=${encodeURIComponent(
+            String(quantity),
+          )}&tShirtSize=${encodeURIComponent(selectedSize || "Default")}&discountPrice=${encodeURIComponent(
+            String(getFinalPrice()),
+          )}`}
+          onClick={(e) => {
+            const needsVariantChoice =
+              !product?.sizes ||
+              product.sizes.length === 0
+                ? (product?.variant?.length || 0) > 1 ||
+                  product?.variant?.some((v) => v.size && v.size.toLowerCase() !== "default")
+                : false;
+            const sizeRequired = product?.sizes && product.sizes.length > 0;
+            const invalid =
+              (sizeRequired && !selectedSize) ||
+              (needsVariantChoice && !hasVariantChosen) ||
+              quantity < 1;
+            if (invalid) {
+              e.preventDefault();
+              toast.error("Select Size and Quantity");
+            }
+          }}
+        >
+          <span>Buy Now</span>
+          <GoArrowUpRight className="sm:text-2xl text-xl" />
+        </Link>
+      </div>
+      {/* cart & buy now button end */}
+
+      <div className="flex gap-4 flex-wrap items-center text-sm sm:text-base">
+        <button
+          type="button"
+          className=" flex items-center gap-1 hover:text-primary transition-all disabled:opacity-60"
+          disabled={!whatsappQuestionUrl}
+          onClick={() => {
+            if (!whatsappQuestionUrl) return;
+            window.open(whatsappQuestionUrl, "_blank", "noopener,noreferrer");
+          }}
+        >
+          <FaRegQuestionCircle /> <span>Ask Question</span>
+        </button>
+        <Link
+          href="/refund-and-return-policy"
+          className=" flex items-center gap-1 hover:text-primary transition-all"
+        >
+          <FaTruckFast /> <span>Delivery & Return</span>
+        </Link>
+        <div className="relative">
+          <button
+            type="button"
+            className="flex items-center gap-1 hover:text-primary transition-all"
+            onClick={() => setIsShareOpen((prev) => !prev)}
+          >
+            <GoShareAndroid />
+            <span> Share</span>
+          </button>
+          {isShareOpen && (
+            <div className="absolute z-20 mt-2 w-44 rounded-lg border border-gray-200 bg-white shadow-lg p-2 flex flex-col gap-1">
+              <button
+                type="button"
+                className="w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-100"
+                onClick={() => {
+                  window.open(
+                    facebookShareUrl,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                  setIsShareOpen(false);
+                }}
+              >
+                Share on Facebook
+              </button>
+              <button
+                type="button"
+                className="w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-100"
+                onClick={() => {
+                  window.open(
+                    whatsappShareUrl,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
+                  setIsShareOpen(false);
+                }}
+              >
+                Share on WhatsApp
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="grid min-[820px]:grid-cols-2 md:grid-cols-1 min-[500px]:grid-cols-2 grid-cols-1 grid-rows-2 min-[500px]:grid-rows-1 md:grid-rows-2 min-[820px]:grid-rows-1 gap-3 text-sm sm:text-base">
+        <div className="flex flex-col items-center justify-center text-center border border-gray-200 bg-gray-50 px-5 py-3 rounded-xl w-full">
+          <div>
+            <FaRegClock size={20} />
+          </div>
+          <p>
+            Estimated Delivery Time:
+            <strong> 2-3 Days</strong>
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center text-center border border-gray-200 bg-gray-50 px-5 py-3 rounded-xl">
+          <div>
+            <TbTruckReturn size={23} />
+          </div>
+          <p>
+            Returnable within <strong>7 days</strong> of purchase.
+            Duties & Taxes are non-refundable.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center flex-wrap gap-5">
+        <div className="flex items-center gap-1">
+          <div className="text-lg sm:text-xl text-gray-600">
+            <RiShieldCheckFill />
+          </div>
+          <p className="text-sm sm:text-base">Guaranteed Safe Payment</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="text-3xl bg-gray-100 px-3 text-gray-800 rounded-lg">
+            <RiVisaLine />
+          </div>
+          <div className="text-3xl bg-gray-100 px-3 text-gray-700 rounded-lg">
+            <RiMastercardFill />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ProductDetails;

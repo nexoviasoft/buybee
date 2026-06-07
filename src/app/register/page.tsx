@@ -1,0 +1,228 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import {
+  FiEye,
+  FiEyeOff,
+  FiLock,
+  FiMail,
+  FiPhone,
+  FiUser,
+} from "react-icons/fi";
+import styled from "styled-components";
+import { useAuth } from "../../context/AuthContext";
+
+const Input = styled.input`
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: 100%;
+  background-color: transparent;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  &:focus {
+    border-color: #0B7A3F;
+    box-shadow: 0 0 0 3px rgba(11, 122, 63, 0.1);
+  }
+`;
+export default function RegisterPage() {
+  const [full_name, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const { register } = useAuth();
+  const canSubmit = useMemo(() => {
+    const validEmail = /\S+@\S+\.\S+/.test(email);
+    const strongPass = password.length >= 6;
+    const match = password && password === confirm;
+    return !!full_name.trim() && validEmail && strongPass && match && !loading;
+  }, [full_name, email, password, confirm, loading]);
+  const passScore = useMemo(() => {
+    let s = 0;
+    if (password.length >= 6) s++;
+    if (/[A-Z]/.test(password)) s++;
+    if (/\d/.test(password)) s++;
+    if (/[^A-Za-z0-9]/.test(password)) s++;
+    return s;
+  }, [password]);
+  const scoreLabel =
+    ["Weak", "Fair", "Good", "Strong", "Very Strong"][passScore] || "Weak";
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    if (!full_name.trim() || !email.trim() || !password.trim()) {
+      setError("Name, email and password are required");
+      setLoading(false);
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError("Please enter a valid email");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      setLoading(false);
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+    const res = await register({
+      name: full_name,
+      email,
+      password,
+    });
+
+    if (res.success) {
+      toast.success("Registration successful.");
+      // AuthContext.register will store token & session if backend returned it,
+      // so we can send the user directly to their dashboard.
+      window.location.href = "/my-account/dashboard";
+    } else {
+      setError(res.error || "Registration failed");
+    }
+    setLoading(false);
+  };
+  return (
+    <div className="min-h-screen relative bg-gradient-to-br from-white to-primary/5">
+      <div className=" px-5 py-8 min-h-screen flex items-center justify-center">
+
+        <div className=" w-[500px] mx-auto rounded-2xl bg-white shadow-md border border-gray-100 overflow-hidden">
+          <div className="px-6 pt-6 text-center">
+            <div className="inline-block mb-3">
+              <span className="text-xs font-bold tracking-widest text-white px-4 py-2 rounded-full bg-primary">
+                New Account
+              </span>
+            </div>
+            <h2 className="text-3xl font-black text-primary">Register</h2>
+          </div>
+          <div className="p-6 border-t border-gray-100">
+            <p className="text-sm text-gray-600 text-center mb-4">
+              Fast delivery, secure payment, satisfaction guaranteed
+            </p>
+            {error && (
+              <div className="mb-3 text-sm text-gray-700 bg-gray-100 border border-gray-300 rounded px-3 py-2">
+                {error}
+              </div>
+            )}
+            <form onSubmit={handleRegister} className="flex flex-col gap-4">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  <FiUser />
+                </span>
+                <Input
+                  type="text"
+                  placeholder="Full Name"
+                  onChange={(e) => setFullName(e.target.value)}
+                  style={{ paddingLeft: "34px" }}
+                />
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  <FiMail />
+                </span>
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ paddingLeft: "34px" }}
+                />
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/4 -translate-y-1/2 text-gray-500">
+                  <FiLock />
+                </span>
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingLeft: "34px", paddingRight: "40px" }}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/4 -translate-y-1/2 text-gray-500"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
+                <div className="mt-2">
+                  <div className="h-2 bg-gray-200 rounded">
+                    <div
+                      className="h-2 rounded bg-primary transition-all"
+                      style={{ width: `${(passScore / 4) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Password Strength: {scoreLabel}
+                  </p>
+                </div>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  <FiLock />
+                </span>
+                <Input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Confirm Password"
+                  onChange={(e) => setConfirm(e.target.value)}
+                  style={{ paddingLeft: "34px", paddingRight: "40px" }}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  onClick={() => setShowConfirm((s) => !s)}
+                  aria-label="Toggle confirm password visibility"
+                >
+                  {showConfirm ? <FiEyeOff /> : <FiEye />}
+                </button>
+              </div>
+              <button
+                className="bg-primary p-2.5 rounded text-white w-full hover:bg-primary/90 disabled:opacity-50 font-semibold"
+                type="submit"
+                disabled={!canSubmit}
+              >
+                {loading ? "Registering..." : "Register"}
+              </button>
+            </form>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-500">or</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+        
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <p>Already have an account?</p>
+              <Link
+                href={`/login?callbackUrl=${encodeURIComponent(pathname || "/")}`}
+                className="text-primary font-semibold"
+              >
+                Login
+              </Link>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

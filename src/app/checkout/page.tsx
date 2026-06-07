@@ -1,0 +1,759 @@
+"use client";
+
+import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
+import { useEffect, useMemo, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import CheckoutCart from "./_components/CheckoutCart";
+import CustomerInfo from "./_components/CustomerInfo";
+import toast from "react-hot-toast";
+import {
+  createOrder,
+  saveIncompleteOrder,
+  getPublicPromocodes,
+  PromoCode,
+  getProduct,
+  getProductBySlug,
+  getSystemUserByCompanyId,
+} from "../../lib/api-services";
+import { API_CONFIG } from "../../lib/api-config";
+
+const CheckoutContent = () => {
+  const { userSession } = useAuth();
+  const { cart, refetch } = useCart();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [district, setDistrict] = useState("");
+  const [upazila, setUpazila] = useState("");
+  const [tShirtSize, setTShirtSize] = useState<string>("");
+  const [promoCode, setPromoCode] = useState("");
+  const [promo, setPromo] = useState<PromoCode | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [availablePromos, setAvailablePromos] = useState<PromoCode[]>([]);
+  const [availablePromosLoading, setAvailablePromosLoading] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "prepaid">("cod");
+  const [deliveryType, setDeliveryType] = useState<"inside" | "outside" | "">(
+    "",
+  );
+  const [enrichedItems, setEnrichedItems] = useState<
+    Array<{
+      id: number;
+      product: {
+        id: number;
+        name: string;
+        thumbnail?: string;
+        images?: { url: string; alt?: string }[];
+      };
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }>
+  >([]);
+  const [companyPhone, setCompanyPhone] = useState<string | null>(null);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [queryProduct, setQueryProduct] = useState<{
+    id: number;
+    product: {
+      id: number;
+      name: string;
+      thumbnail?: string;
+      images?: { url: string; alt?: string }[];
+    };
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  } | null>(null);
+  const [initialPromoFromQuery, setInitialPromoFromQuery] = useState<
+    string | null
+  >(null);
+  const [incompleteOrderId, setIncompleteOrderId] = useState<number | null>(
+    null,
+  );
+  const incompleteOrderIdRef = useRef<number | null>(null);
+  const orderSucceededRef = useRef(false); // prevent incomplete save after real order placed
+  const hasAppliedInitialPromo = useRef(false);
+  const saveTimeoutRef = useRef<any>(null);
+
+  const getPromoProductIds = (p: PromoCode): number[] => {
+    if (!Array.isArray((p as any).productIds)) return [];
+    return (p.productIds as Array<number | string>)
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n));
+  };
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    const size = searchParams.get("tShirtSize");
+    if (size) {
+      setTShirtSize(size);
+    }
+  }, [searchParams]);
+
+  // Fetch product from query params and promo code
+  useEffect(() => {
+    const rawProductId = searchParams.get("productId");
+    const rawQuantity = searchParams.get("quantity");
+    const companyId =
+      searchParams.get("companyId") ||
+      userSession?.companyId ||
+      API_CONFIG.companyId;
+
+    const promoFromQuery = searchParams.get("promoCode");
+
+    if (promoFromQuery) {
+      setInitialPromoFromQuery(promoFromQuery);
+      setPromoCode(promoFromQuery);
+    }
+
+    if (rawProductId && companyId) {
+      const parsedQuantity = (() => {
+        if (!rawQuantity) return 1;
+        const n = Number(rawQuantity);
+        if (!Number.isFinite(n) || n <= 0) return 1;
+        return Math.floor(n);
+      })();
+
+      const fetchQueryProduct = async () => {
+        try {
+          // Support both numeric IDs and slug/SKU values for productId
+          const isNumericId = /^[0-9]+$/.test(rawProductId);
+          const product = isNumericId
+            ? await getProduct(Number(rawProductId), companyId)
+            : await getProductBySlug(rawProductId, companyId);
+
+          // Calculate final price (prioritizing flash sale, then discount)
+          const hasDiscount =
+            typeof product.discountPrice === "number" &&
+            typeof product.price === "number" &&
+            product.discountPrice > 0 &&
+            product.discountPrice < product.price;
+          const rawDiscount = searchParams.get("discountPrice");
+          const discountOverride = rawDiscount ? Number(rawDiscount) : NaN;
+          const finalPrice = Number(
+            Number.isFinite(discountOverride) && discountOverride > 0
+              ? discountOverride
+              : product.isFlashSell &&
+                  typeof product.flashSellPrice === "number"
+                ? product.flashSellPrice
+                : hasDiscount
+                  ? product.discountPrice
+                  : (product.price ?? 0),
+          );
+          setQueryProduct({
+            id: 0, // Temporary ID for query product
+            product: {
+              id: product.id,
+              name: product.name,
+              thumbnail: product.thumbnail,
+              images: product.images,
+            },
+            quantity: parsedQuantity,
+            unitPrice: finalPrice,
+            totalPrice: finalPrice * parsedQuantity,
+          });
+        } catch (error) {
+          console.error("Failed to fetch product from query params:", error);
+          toast.error("Failed to load product");
+        }
+      };
+
+      fetchQueryProduct();
+    } else {
+      setQueryProduct(null);
+    }
+  }, [searchParams, userSession?.companyId]);
+
+  // Fetch system user (store) contact / branding for checkout
+  useEffect(() => {
+    const companyId = userSession?.companyId || API_CONFIG.companyId;
+    if (!companyId) return;
+    getSystemUserByCompanyId(companyId).then((user) => {
+      if (user?.phone) setCompanyPhone(user.phone);
+      if (user?.companyLogo) setCompanyLogo(user.companyLogo);
+    });
+  }, [userSession?.companyId]);
+
+  // Prefill user info when logged in
+  useEffect(() => {
+    if (userSession?.user) {
+      setName(userSession.user.name || "");
+      setEmail(userSession.user.email || "");
+      setPhone((userSession.user.phone as string | undefined) || "");
+      setAddress((userSession.user.address as string | undefined) || "");
+      setDistrict((userSession.user.district as string | undefined) || "");
+      setUpazila((userSession.user.upazila as string | undefined) || "");
+    }
+  }, [userSession]);
+
+  // Fetch product details for cart items
+  useEffect(() => {
+    const enrichCartItems = async () => {
+      if (
+        !cart?.items ||
+        !Array.isArray(cart.items) ||
+        !cart.items.length ||
+        !userSession?.companyId
+      ) {
+        setEnrichedItems([]);
+        return;
+      }
+
+      try {
+        const companyId = userSession.companyId || API_CONFIG.companyId;
+        const enriched = await Promise.all(
+          cart.items.map(async (item) => {
+            // If product already has name, use it
+            if (item.product?.name) {
+              return item;
+            }
+            // Otherwise fetch product details
+            try {
+              const product = await getProduct(item.product.id, companyId);
+              return {
+                ...item,
+                product: {
+                  id: product.id,
+                  name: product.name,
+                  thumbnail: product.thumbnail,
+                  images: product.images,
+                },
+              };
+            } catch (error) {
+              console.error(
+                `Failed to fetch product ${item.product.id}:`,
+                error,
+              );
+              return item;
+            }
+          }),
+        );
+        setEnrichedItems(enriched);
+      } catch (error) {
+        console.error("Failed to enrich cart items:", error);
+        setEnrichedItems(Array.isArray(cart.items) ? cart.items : []);
+      }
+    };
+
+    enrichCartItems();
+  }, [cart?.items, userSession?.companyId]);
+
+  // Clear query product if it's already in cart
+  useEffect(() => {
+    // Keep query params intact; avoid duplication handled in items useMemo
+    // No state or URL changes here
+  }, [queryProduct, cart?.items]);
+
+  // Combine cart items with query product if present
+  const items = useMemo(() => {
+    const cartItems =
+      enrichedItems.length > 0
+        ? enrichedItems
+        : Array.isArray(cart?.items)
+          ? cart.items
+          : [];
+
+    // If query product exists and not already in cart, add it
+    if (queryProduct) {
+      const existsInCart = cartItems.some(
+        (item) => item.product.id === queryProduct.product.id,
+      );
+      if (!existsInCart) {
+        return [queryProduct, ...cartItems];
+      }
+    }
+
+    return cartItems;
+  }, [enrichedItems, cart?.items, queryProduct]);
+  const subtotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) => sum + Number(item.unitPrice || 0) * (item.quantity || 0),
+        0,
+      ),
+    [items],
+  );
+
+  const discount = useMemo(() => {
+    if (!promo) return 0;
+    // validate min order
+    if (promo.minOrderAmount && subtotal < promo.minOrderAmount) return 0;
+    if (promo.discountType === "percentage") {
+      return Math.min((subtotal * promo.discountValue) / 100, subtotal);
+    }
+    return Math.min(promo.discountValue, subtotal);
+  }, [promo, subtotal]);
+
+  const shippingCharge =
+    deliveryType === "inside" ? 60 : deliveryType === "outside" ? 120 : 0;
+  const total = Math.max(subtotal - discount, 0);
+  const grandTotal = total + shippingCharge;
+
+  const handleQueryItemQuantityChange = async (
+    item: {
+      id: number;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+      product: {
+        id: number;
+        name: string;
+        thumbnail?: string;
+        images?: { url: string; alt?: string }[];
+      };
+    },
+    nextQty: number,
+  ) => {
+    if (item.id !== 0) return;
+    const safeQty = Math.max(1, Math.floor(Number(nextQty || 1)));
+    setQueryProduct({
+      ...item,
+      quantity: safeQty,
+      totalPrice: Number(item.unitPrice || 0) * safeQty,
+    });
+    const url = new URL(window.location.href);
+    url.searchParams.set("quantity", String(safeQty));
+    window.history.replaceState({}, "", url.toString());
+  };
+
+  // Auto apply promo from query once order subtotal is ready
+  useEffect(() => {
+    if (!initialPromoFromQuery || hasAppliedInitialPromo.current) return;
+    if (subtotal <= 0) return;
+
+    hasAppliedInitialPromo.current = true;
+    applyPromoCore(initialPromoFromQuery);
+  }, [initialPromoFromQuery, subtotal]);
+  const applyPromoCore = async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    const companyId =
+      searchParams.get("companyId") ||
+      userSession?.companyId ||
+      API_CONFIG.companyId;
+    if (!companyId) {
+      toast.error("Company information missing");
+      return;
+    }
+    try {
+      setPromoLoading(true);
+      let promos: PromoCode[] = availablePromos;
+      if (!promos.length) {
+        promos = await getPublicPromocodes(companyId);
+      }
+      const now = new Date();
+      const match = promos.find(
+        (p) =>
+          p.code.toLowerCase() === trimmed.toLowerCase() &&
+          p.isActive &&
+          (!p.startsAt || new Date(p.startsAt) <= now) &&
+          (!p.expiresAt || new Date(p.expiresAt) >= now),
+      );
+      if (!match) {
+        toast.error("Invalid promo code");
+        setPromo(null);
+        return;
+      }
+      // date checks (reuse now from above)
+      if (match.startsAt && new Date(match.startsAt) > now) {
+        toast.error("Promo not started");
+        setPromo(null);
+        return;
+      }
+      if (match.expiresAt && new Date(match.expiresAt) < now) {
+        toast.error("Promo expired");
+        setPromo(null);
+        return;
+      }
+      if (match.minOrderAmount && subtotal < match.minOrderAmount) {
+        toast.error(`Minimum order ${match.minOrderAmount} required`);
+        setPromo(null);
+        return;
+      }
+
+      // Ensure promo is applicable to at least one product in the cart, if productIds restriction exists
+      if (Array.isArray(match.productIds) && match.productIds.length > 0) {
+        const itemProductIds = items.map((i: any) => i.product.id);
+        const promoProductIds = getPromoProductIds(match);
+        const applicable = promoProductIds.some((id) =>
+          itemProductIds.includes(id),
+        );
+        if (!applicable) {
+          toast.error(
+            "This coupon is not applicable for your selected products",
+          );
+          setPromo(null);
+          return;
+        }
+      }
+      setPromoCode(match.code);
+      setPromo(match);
+      toast.success("Promo applied");
+    } catch (error) {
+      console.error("Failed to apply promo", error);
+      toast.error("Failed to apply promo");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const applyPromo = async () => {
+    if (!promoCode.trim()) return;
+    await applyPromoCore(promoCode);
+  };
+
+  const applyPromoFromButton = async (code: string) => {
+    setPromoCode(code);
+    await applyPromoCore(code);
+  };
+
+  // Prefetch available promos for auto-select buttons
+  useEffect(() => {
+    const fetchPromos = async () => {
+      const companyId =
+        searchParams.get("companyId") ||
+        userSession?.companyId ||
+        API_CONFIG.companyId;
+      if (!companyId) {
+        setAvailablePromos([]);
+        return;
+      }
+      try {
+        setAvailablePromosLoading(true);
+        const promos = await getPublicPromocodes(companyId);
+        const now = new Date();
+        const activePromos = promos.filter((p) => {
+          if (!p.isActive) return false;
+          if (p.startsAt && new Date(p.startsAt) > now) return false;
+          if (p.expiresAt && new Date(p.expiresAt) < now) return false;
+          return true;
+        });
+
+        // Product checkout হলে: শুধু ওই প্রোডাক্টে assigned promo codes দেখাবে
+        const hasSingleProductParam = !!searchParams.get("productId");
+        const targetProductId = queryProduct?.product?.id;
+
+        let relevantPromos: PromoCode[] = [];
+
+        if (hasSingleProductParam && targetProductId) {
+          relevantPromos = activePromos.filter(
+            (p) =>
+              Array.isArray(p.productIds) &&
+              p.productIds.length > 0 &&
+              getPromoProductIds(p).includes(targetProductId),
+          );
+        } else {
+          // Regular checkout: show promos relevant to current cart items (including global promos)
+          const itemProductIds = items.map((i) => i.product.id);
+          relevantPromos = activePromos.filter((p) => {
+            if (!Array.isArray(p.productIds) || p.productIds.length === 0) {
+              return true; // global promo
+            }
+            const promoProductIds = getPromoProductIds(p);
+            return promoProductIds.some((id) => itemProductIds.includes(id));
+          });
+        }
+
+        setAvailablePromos(relevantPromos);
+      } catch (error) {
+        console.error("Failed to load promo codes", error);
+        setAvailablePromos([]);
+      } finally {
+        setAvailablePromosLoading(false);
+      }
+    };
+
+    fetchPromos();
+  }, [searchParams, userSession?.companyId, items, queryProduct?.product?.id]);
+
+  // Keep a ref always pointing to the latest save function to avoid stale closures in event handlers
+  const saveIncompleteRef = useRef<() => void>(() => {});
+
+  // Build the latest save function and store it in the ref on every render
+  const performSaveIncomplete = async () => {
+    if (orderSucceededRef.current) return; // real order placed — don't save incomplete
+    if (!name.trim() && !phone.trim() && !email.trim()) return;
+
+    const companyId =
+      searchParams.get("companyId") ||
+      userSession?.companyId ||
+      API_CONFIG.companyId;
+
+    if (!companyId) return;
+
+    try {
+      const payload = {
+        customerId: userSession?.userId,
+        customerName: name,
+        customerPhone: phone,
+        customerEmail: email,
+        customerAddress: [upazila.trim(), district.trim(), address.trim()]
+          .filter(Boolean)
+          .join(", "),
+        items: items.map((i: any) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+      };
+
+      const res = await saveIncompleteOrder(
+        payload,
+        companyId,
+        incompleteOrderIdRef.current || undefined,
+      );
+
+      if (res?.id) {
+        incompleteOrderIdRef.current = res.id;
+        setIncompleteOrderId(res.id);
+      }
+    } catch (error) {
+      console.error("Failed to save incomplete order:", error);
+    }
+  };
+  // Always update the ref so event listeners always call the freshest version
+  saveIncompleteRef.current = performSaveIncomplete;
+
+  // Debounced auto-save: fires 2s after user stops typing
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(
+      () => saveIncompleteRef.current(),
+      2000,
+    );
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [name, phone, email, address, district, upazila, items]);
+
+  // Save on page leave (beforeunload + cleanup) using the always-fresh ref
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveIncompleteRef.current();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      saveIncompleteRef.current(); // also save on React unmount (navigation)
+    };
+  }, []); // ← empty deps: only register/unregister once; ref always has fresh fn
+
+  const handleOrder = async () => {
+    const companyId =
+      searchParams.get("companyId") ||
+      userSession?.companyId ||
+      API_CONFIG.companyId;
+
+    if (!companyId) {
+      toast.error("Store information missing");
+      return;
+    }
+
+    if (!items.length) {
+      toast.error("Cart is empty");
+      return;
+    }
+
+    // tShirtSize optional now; carried from product page if present
+
+    if (
+      !name.trim() ||
+      !phone.trim() ||
+      !district.trim() ||
+      !upazila.trim() ||
+      !address.trim()
+    ) {
+      toast.error("Name, phone, district, upazila, and address are required");
+      return;
+    }
+
+    const trimmedPhone = phone.trim();
+    if (!/^[0-9]+$/.test(trimmedPhone)) {
+      toast.error("Phone number must contain only digits");
+      return;
+    }
+
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    if (!deliveryType) {
+      toast.error("Select delivery type");
+      return;
+    }
+
+    try {
+      setOrderLoading(true);
+
+      const combinedAddress = [upazila.trim(), district.trim(), address.trim()]
+        .filter(Boolean)
+        .join(", ");
+
+      const payload: {
+        customerId?: number;
+        customerName?: string;
+        customerPhone?: string;
+        customerEmail?: string;
+        customerAddress?: string;
+        shippingAddress?: string;
+        deliveryType?: "INSIDEDHAKA" | "OUTSIDEDHAKA";
+        paymentMethod?: "DIRECT" | "COD";
+        orderInfo?: string;
+        items: { productId: number; quantity: number }[];
+      } = {
+        customerName: name,
+        customerPhone: phone,
+        customerEmail: email,
+        customerAddress: combinedAddress,
+        shippingAddress: combinedAddress,
+        deliveryType:
+          deliveryType === "inside" ? "INSIDEDHAKA" : "OUTSIDEDHAKA",
+        paymentMethod: paymentMethod === "cod" ? "COD" : "DIRECT",
+        orderInfo: tShirtSize ? `tShirtSize ${tShirtSize}` : undefined,
+        items: items.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+      };
+
+      // If user is logged in, also attach customerId so backend links to their account
+      if (userSession?.userId) {
+        payload.customerId = userSession.userId;
+        payload.customerEmail = email || userSession.user?.email || undefined;
+      }
+
+      const res = (await createOrder(
+        payload,
+        userSession?.accessToken,
+        companyId,
+      )) as any;
+
+      orderSucceededRef.current = true; // prevent cleanup from saving incomplete order
+      toast.success("Order placed successfully");
+
+      if (userSession?.accessToken && userSession?.userId) {
+        await refetch();
+        router.push("/my-account/orders");
+      } else {
+        const orderId: number | undefined =
+          res?.order?.id ?? res?.id ?? undefined;
+        const emailToUse = email || userSession?.user?.email || "";
+        if (emailToUse && orderId) {
+          router.push(
+            `/complete-signup?email=${encodeURIComponent(emailToUse)}&orderId=${orderId}`,
+          );
+        } else if (emailToUse) {
+          router.push(
+            `/complete-signup?email=${encodeURIComponent(emailToUse)}`,
+          );
+        } else {
+          router.push("/");
+        }
+      }
+    } catch (error) {
+      console.error("Order failed", error);
+      toast.error("Order failed");
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50/50">
+      <section className="max-w-7xl mx-auto px-3 sm:px-5 py-6">
+        <div className="flex flex-col gap-3 border-b border-gray-200 pb-4 mb-5">
+          <div className="flex items-center gap-3">
+            {companyLogo && (
+              <div className="flex h-9 w-9 items-center justify-center  bg-white border border-gray-100 overflow-hidden shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={companyLogo}
+                  alt="Store logo"
+                  className="h-7 w-7 object-contain"
+                />
+              </div>
+            )}
+            <div className="flex flex-col">
+              <p className="text-[10px] font-bold tracking-widest text-primary uppercase leading-tight">
+                Checkout
+              </p>
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">
+                Complete Order
+              </h1>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 min-[820px]:grid-cols-5 min-[950px]:grid-cols-3">
+          <div className="min-[820px]:col-span-3 min-[950px]:col-span-2">
+            <CustomerInfo
+              name={name}
+              setName={setName}
+              email={email}
+              setEmail={setEmail}
+              phone={phone}
+              setPhone={setPhone}
+              district={district}
+              setDistrict={setDistrict}
+              upazila={upazila}
+              setUpazila={setUpazila}
+              address={address}
+              setAddress={setAddress}
+              paymentMethod={paymentMethod}
+              setPaymentMethod={setPaymentMethod}
+              deliveryType={deliveryType}
+              setDeliveryType={setDeliveryType}
+              onSubmit={handleOrder}
+              submitting={orderLoading}
+            />
+          </div>
+          <div className="min-[820px]:col-span-2 min-[950px]:col-span-1 order-first min-[820px]:order-none md:sticky md:top-24 self-start">
+            <CheckoutCart
+              contactPhone={companyPhone}
+              items={items}
+              subtotal={subtotal}
+              discount={discount}
+              total={total}
+              shipping={shippingCharge}
+              grandTotal={grandTotal}
+              promoCode={promoCode}
+              setPromoCode={setPromoCode}
+              applyPromo={applyPromo}
+              promoLoading={promoLoading}
+              promo={promo}
+              availablePromos={availablePromos}
+              availablePromosLoading={availablePromosLoading}
+              applyPromoFromButton={applyPromoFromButton}
+              onChangeItemQuantity={handleQueryItemQuantityChange}
+              isProductCheckout={!!searchParams.get("productId")}
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const Checkout = () => {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[300px] flex items-center justify-center">
+          <p className="text-sm text-primary">Loading Checkout...</p>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  );
+};
+
+export default Checkout;
