@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Buybee - Shop Quality Products Online",
     description: "Discover top-tier cosmetics, gifts, and exclusive exltex products at Buybee. Your number one destination for secure and fast online shopping.",
-    url: "https://buybee.com",
+    url: "https://buybee.shop",
     siteName: "Buybee",
     type: "website",
     locale: "en_US",
@@ -91,7 +91,7 @@ export default function RootLayout({
           />
         </head>
         <body className={`${hindSiliguriFonts.variable} ${baiJamjuree.variable} font-baiJamjuree antialiased bg-white text-black`}>
-          <AntiDevTools />
+          {/* <AntiDevTools /> */}
           <AuthProvider>
             <Toaster />
             <CartProvider>
