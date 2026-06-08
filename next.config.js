@@ -14,7 +14,7 @@ const nextConfig = {
       { protocol: "https", hostname: "g8izugtr3lsr8cfx.public.blob.vercel-storage.com" },
       { protocol: "https", hostname: "e-cdn.vercel.app", pathname: "/uploads/**" },
       { protocol: "http", hostname: "e-cdn.vercel.app", pathname: "/uploads/**" },
-      { protocol: "https", hostname: "i.ibb.co" },
+      { protocol: "https", hostname: "i.ibb.co", pathname: "/**" },
       // Allow CDN used by backend for product images (both http and https just in case)
       { protocol: "https", hostname: "innowavelog-cdn.up.railway.app", pathname: "/uploads/**" },
       { protocol: "http", hostname: "innowavelog-cdn.up.railway.app", pathname: "/uploads/**" },
