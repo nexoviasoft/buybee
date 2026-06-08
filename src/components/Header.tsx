@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CiSearch } from "react-icons/ci";
 import { FaBars, FaRegUser, FaXmark } from "react-icons/fa6";
@@ -12,7 +12,7 @@ import CartDrawer from "./shopping cart/CartDrawer";
 import { useAuth } from "../context/AuthContext";
 import { Button, Modal } from "antd";
 import { API_CONFIG } from "../lib/api-config";
-import { getSystemUserByCompanyId } from "../lib/api-services";
+import { getSystemUserByCompanyId, getProducts, type Product } from "../lib/api-services";
 import { FiLogIn, FiUserPlus } from "react-icons/fi";
 
 const Header = () => {
@@ -20,6 +20,10 @@ const Header = () => {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [toggle, setToggle] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
   const [isLogoLoading, setIsLogoLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -56,6 +60,48 @@ const Header = () => {
     };
   }, [companyId]);
 
+  // Fetch products for live search
+  useEffect(() => {
+    let mounted = true;
+    const fetchProducts = async () => {
+      try {
+        const data = await getProducts();
+        if (mounted) setAllProducts(data);
+      } catch (err) {
+        console.error("Failed to load products for search", err);
+      }
+    };
+    fetchProducts();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Filter products on search term change
+  useEffect(() => {
+    if (searchTerm.trim().length > 0) {
+      const filtered = allProducts.filter((p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setSearchResults(filtered);
+      setIsSearchOpen(true);
+    } else {
+      setSearchResults([]);
+      setIsSearchOpen(false);
+    }
+  }, [searchTerm, allProducts]);
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleSearch = () => {
     const query = searchTerm.trim();
     if (!query) return;
@@ -91,30 +137,91 @@ const Header = () => {
 
         {/* search by category and products name  */}
 
-        <div className="flex-1 min-w-0 max-w-xl rounded-full border-[.1rem] border-primary flex items-center pr-1 sm:pr-2 pl-2">
-          <span className=" text-lg">
-            <CiSearch />
-          </span>
-          <input
-            type="text"
-            id="Search"
-            placeholder="Search for..."
-            className="w-full border-none outline-none bg-transparent  sm:py-2.5 py-1.5  pl-3 sm:text-sm text-xs"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
+        <div ref={searchRef} className="flex-1 min-w-0 max-w-xl relative">
+          <div className="rounded-full border-[.1rem] border-primary flex items-center pr-1 sm:pr-2 pl-2 bg-white">
+            <span className=" text-lg">
+              <CiSearch />
+            </span>
+            <input
+              type="text"
+              id="Search"
+              placeholder="Search for..."
+              className="w-full border-none outline-none bg-transparent  sm:py-2.5 py-1.5  pl-3 sm:text-sm text-xs"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => {
+                if (searchTerm.trim().length > 0) setIsSearchOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSearch();
+                  setIsSearchOpen(false);
+                }
+              }}
+            />
+            <span
+              onClick={() => {
                 handleSearch();
-              }
-            }}
-          />
-          <span
-            onClick={handleSearch}
-            className=" bg-primary text-white sm:px-3 px-2 sm:py-1 py-[2px] sm:text-base text-sm rounded-full cursor-pointer"
-          >
-            Search
-          </span>
+                setIsSearchOpen(false);
+              }}
+              className=" bg-primary text-white sm:px-3 px-2 sm:py-1 py-[2px] sm:text-base text-sm rounded-full cursor-pointer"
+            >
+              Search
+            </span>
+          </div>
+
+          {/* Search Dropdown Modal */}
+          {isSearchOpen && (
+            <div className="absolute top-[110%] left-0 right-0 bg-white rounded-xl shadow-xl border border-gray-100 max-h-[400px] overflow-y-auto z-50">
+              {searchResults.length > 0 ? (
+                <div className="p-2 flex flex-col gap-1">
+                  {searchResults.slice(0, 10).map((product) => (
+                    <Link
+                      key={product.id}
+                      href={`/products/${product.id}`}
+                      onClick={() => setIsSearchOpen(false)}
+                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <div className="w-12 h-12 relative flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
+                        {(product.thumbnail || product.images?.[0]?.url) ? (
+                          <Image
+                            src={product.thumbnail || product.images![0].url}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-xs text-gray-400">
+                            No img
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                        <p className="text-sm font-bold text-primary">৳{product.discountPrice ?? product.price}</p>
+                      </div>
+                    </Link>
+                  ))}
+                  {searchResults.length > 10 && (
+                    <button
+                      onClick={() => {
+                        handleSearch();
+                        setIsSearchOpen(false);
+                      }}
+                      className="text-sm text-center py-2 w-full text-primary font-medium hover:bg-gray-50 rounded-lg"
+                    >
+                      View all {searchResults.length} results
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  No products found for "{searchTerm}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex  gap-5 items-center">

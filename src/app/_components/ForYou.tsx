@@ -8,8 +8,6 @@ const ForYou = async () => {
 
   try {
     products = await getProducts();
-    // Limit to 10 products
-    products = products.slice(0, 10);
   } catch (error) {
     console.error("Failed to load products:", error);
     // products will remain empty array
@@ -19,9 +17,22 @@ const ForYou = async () => {
     return null;
   }
 
+  // Group products by category
+  const groupedProducts = products.reduce((acc, product) => {
+    const categoryName = product.category?.name || "Others";
+    if (!acc[categoryName]) {
+      acc[categoryName] = [];
+    }
+    // Limit to 10 products per category for display
+    if (acc[categoryName].length < 10) {
+      acc[categoryName].push(product);
+    }
+    return acc;
+  }, {} as Record<string, Product[]>);
+
   return (
     <section className="max-w-7xl mx-auto px-5 overflow-hidden md:pt-6 pt-3">
-      <div className="mb-3 sm:mb-4 flex items-start justify-between gap-5">
+      <div className="mb-6 sm:mb-8 flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -32,27 +43,27 @@ const ForYou = async () => {
             </h1>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-gray-500">
-            Fresh arrivals and customer favorites in one place.
+            Fresh arrivals and customer favorites organized by category.
           </p>
         </div>
-        <Link
-          href={"/products"}
-          className="shrink-0 text-primary underline underline-offset-4 hover:text-gray-700 cursor-pointer transition-all font-medium text-sm"
-        >
-          View All Products
-        </Link>
       </div>
 
-      <ForYouGrid products={products} />
-
-      <div className="flex items-center justify-center">
-        <Link
-          href={"/products"}
-          className="mt-5 text-center bg-primary hover:bg-gray-800 max-w-max text-white px-10 py-1.5 rounded cursor-pointer"
-        >
-          View More
-        </Link>
-      </div>
+      {Object.entries(groupedProducts).map(([categoryName, categoryProducts]) => (
+        <div key={categoryName} className="mb-10 last:mb-0">
+          <div className="flex items-center justify-between mb-4 border-b pb-2">
+            <h2 className="text-xl font-semibold text-gray-800 capitalize">
+              {categoryName}
+            </h2>
+            <Link
+              href={`/products`}
+              className="text-primary hover:text-gray-700 text-sm font-medium transition-colors hover:underline underline-offset-4"
+            >
+              View All
+            </Link>
+          </div>
+          <ForYouGrid products={categoryProducts} />
+        </div>
+      ))}
     </section>
   );
 };

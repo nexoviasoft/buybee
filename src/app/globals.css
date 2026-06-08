@@ -4,9 +4,9 @@
 
 @layer base {
   :root {
-    /* Green and black theme */
-    --primary: 148, 83%, 26%; /* #0B7A3F */
-    --secondary: 0, 0%, 0%; /* #000000 */
+    /* Orange and Blue theme */
+    --primary: 30, 89%, 54%; /* #F28B23 */
+    --secondary: 208, 62%, 25%; /* #184166 */
   }
 }
 
@@ -14,7 +14,7 @@
 .btn-submit,
 button[type="submit"],
 .submit-btn {
-  background-color: #0B7A3F;
+  background-color: #F28B23;
   color: #ffffff;
   padding: 12px 16px;
   border-radius: 0;
@@ -31,12 +31,12 @@ button[type="submit"],
 .btn-submit:hover,
 button[type="submit"]:hover,
 .submit-btn:hover {
-  background-color: #096132;
+  background-color: #D97B1E;
 }
 
 .btn-cancel,
 .cancel-btn {
-  background-color: #333333;
+  background-color: #184166;
   color: #ffffff;
   padding: 12px 16px;
   border-radius: 0;
@@ -52,7 +52,7 @@ button[type="submit"]:hover,
 }
 .btn-cancel:hover,
 .cancel-btn:hover {
-  background-color: #000000;
+  background-color: #112F4A;
 }
 
 /* MAKE ALL BUTTONS SQUARE */
@@ -95,10 +95,10 @@ button.btn-rounded,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #0B7A3F;
+  background: #F28B23;
   border-radius: 10px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #096132;
+  background: #D97B1E;
 }

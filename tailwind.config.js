@@ -14,10 +14,10 @@ module.exports = {
         baiJamjuree: ["var(--font-baiJamjuree)", "var(--font-hindSiliguri)"],
       },
       colors: {
-        // Green and black theme
-        primary: "#0B7A3F",
-        primaryDark: "#096132",
-        accent: "#000000",
+        // Orange and Blue theme from BuyBee logo
+        primary: "#F28B23",
+        primaryDark: "#D97B1E",
+        accent: "#184166",
       },
     },
   },

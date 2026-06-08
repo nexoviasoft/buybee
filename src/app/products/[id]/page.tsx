@@ -86,11 +86,11 @@ function mapProductToComponentFormat(
   // Calculate discount percentage based on effective discount price
   const off =
     effectiveDiscountPrice &&
-    numericPrice &&
-    effectiveDiscountPrice < numericPrice
+      numericPrice &&
+      effectiveDiscountPrice < numericPrice
       ? Math.round(
-          ((numericPrice - effectiveDiscountPrice) / numericPrice) * 100,
-        )
+        ((numericPrice - effectiveDiscountPrice) / numericPrice) * 100,
+      )
       : 0;
 
   // Map images
@@ -117,9 +117,9 @@ function mapProductToComponentFormat(
           : 0,
       stock_status:
         apiProduct.isActive &&
-        ((apiProduct as any).stock != null
-          ? Number((apiProduct as any).stock)
-          : 0) > 0
+          ((apiProduct as any).stock != null
+            ? Number((apiProduct as any).stock)
+            : 0) > 0
           ? "in_stock"
           : "out_of_stock",
     },
@@ -129,18 +129,18 @@ function mapProductToComponentFormat(
   const rawSizes: unknown = (apiProduct as any).sizes;
   const sizes: string[] = Array.isArray(rawSizes)
     ? (rawSizes as unknown[])
-        .map((v) => (typeof v === "string" ? v.trim() : String(v)))
-        .filter((s) => !!s)
+      .map((v) => (typeof v === "string" ? v.trim() : String(v)))
+      .filter((s) => !!s)
     : [];
 
   // Map category to categories array
   const categories: CategoryProps[] = apiProduct.category
     ? [
-        {
-          name: apiProduct.category.name,
-          slug: apiProduct.category.slug,
-        },
-      ]
+      {
+        name: apiProduct.category.name,
+        slug: apiProduct.category.slug,
+      },
+    ]
     : [];
 
   // Map description

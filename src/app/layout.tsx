@@ -11,33 +11,68 @@ import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { ConfigProvider } from "antd";
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
+import FloatingContact from "@/components/FloatingContact";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "AimsPurified",
-    template: "%s | AimsPurified",
+    default: "Buybee - Your Ultimate Online Shopping Destination",
+    template: "%s | Buybee",
   },
-  description: "AimsPurified Shop quality products.",
-  keywords: ["AimsPurified", "mangshomoshla", "boroi achar", "biscute", "jhalmuri"],
-  authors: [{ name: "AimsPurified" }],
-  creator: "AimsPurified",
+  description: "Welcome to Buybee! Shop the best quality products including exltex, cosmetics, gifts, electronics, and daily essentials at unbeatable prices.",
+  keywords: [
+    "Buybee",
+    "buybee shop",
+    "buybee online",
+    "buy bee",
+    "exltex",
+    "cosmetics",
+    "cusdttics",
+    "gift",
+    "product",
+    "online shopping",
+    "best deals",
+    "buybee website",
+    "e-commerce",
+  ],
+  authors: [{ name: "Buybee" }],
+  creator: "Buybee",
+  publisher: "Buybee",
+  applicationName: "Buybee",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   openGraph: {
-    title: "AimsPurified",
-    description: "AimsPurified Shop quality products.",
+    title: "Buybee - Shop Quality Products Online",
+    description: "Discover top-tier cosmetics, gifts, and exclusive exltex products at Buybee. Your number one destination for secure and fast online shopping.",
+    url: "https://buybee.com",
+    siteName: "Buybee",
     type: "website",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AimsPurified",
-    description: "AimsPurified  Shop quality products.",
+    title: "Buybee - Shop Quality Products Online",
+    description: "Discover top-tier cosmetics, gifts, and exclusive exltex products at Buybee. Your number one destination for secure and fast online shopping.",
+    creator: "@Buybee",
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
   icons: {
     icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 
@@ -66,6 +101,7 @@ export default function RootLayout({
                 <div className="min-h-screen">{children}</div>
                 <Footer />
                 <BottomNav />
+                <FloatingContact />
               </AntdRegistry>
             </CartProvider>
           </AuthProvider>

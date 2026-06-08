@@ -159,7 +159,7 @@ const Footer = () => {
               <MdOutlineEmail />
             </Link>
             <Link
-              href="https://www.facebook.com/people/Aims-Purified/61578248000957/?rdid=XIrNNlnUpnPPFq0q"
+              href="https://www.facebook.com/profile.php?id=61590682648816"
               target="_blank"
               rel="noopener noreferrer"
               className=" border border-gray-500 rounded-full p-2 text-lg hover:border-white hover:text-white transition-all duration-200 ease-linear cursor-pointer"
