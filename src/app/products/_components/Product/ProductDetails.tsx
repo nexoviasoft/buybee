@@ -93,7 +93,7 @@ const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
   );
   const [hasVariantChosen, setHasVariantChosen] = useState(false);
 
-
+ 
 
   const handlePrice = useCallback((variantPrice: number = 0) => {
     setPrice(variantPrice);
@@ -176,10 +176,10 @@ const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
 
   const whatsappQuestionUrl = ownerPhone
     ? `https://wa.me/${encodeURIComponent(
-      ownerPhone.replace(/[^0-9]/g, ""),
-    )}?text=${encodeURIComponent(
-      `Dear Sir, I want to know something about this product: ${product?.title} - ${shareUrl}`,
-    )}`
+        ownerPhone.replace(/[^0-9]/g, ""),
+      )}?text=${encodeURIComponent(
+        `Dear Sir, I want to know something about this product: ${product?.title} - ${shareUrl}`,
+      )}`
     : null;
 
 
@@ -247,8 +247,9 @@ const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
               <button
                 key={sz}
                 onClick={() => setSelectedSize(sz)}
-                className={`btn-rounded border-[1.5px] border-gray-300 px-3 py-1 rounded-lg hover:border-primary transition-all ease-linear duration-200 ${selectedSize === sz ? "border-primary" : ""
-                  }`}
+                className={`btn-rounded border-[1.5px] border-gray-300 px-3 py-1 rounded-lg hover:border-primary transition-all ease-linear duration-200 ${
+                  selectedSize === sz ? "border-primary" : ""
+                }`}
               >
                 {sz}
               </button>
@@ -288,7 +289,7 @@ const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
       </div>
       {/* product price info end */}
 
-
+      
 
       {/* cart & buy now button start */}
       <div className="flex min-[1035px]:flex-row md:flex-col min-[500px]:flex-row flex-col gap-3">
@@ -332,9 +333,9 @@ const ProductDetails: React.FC<ProductProps> = ({ product, promos }) => {
           onClick={(e) => {
             const needsVariantChoice =
               !product?.sizes ||
-                product.sizes.length === 0
+              product.sizes.length === 0
                 ? (product?.variant?.length || 0) > 1 ||
-                product?.variant?.some((v) => v.size && v.size.toLowerCase() !== "default")
+                  product?.variant?.some((v) => v.size && v.size.toLowerCase() !== "default")
                 : false;
             const sizeRequired = product?.sizes && product.sizes.length > 0;
             const invalid =
